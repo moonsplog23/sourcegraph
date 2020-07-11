@@ -145,7 +145,8 @@ func initCampaigns(ctx context.Context, enterpriseServices *enterprise.Services)
 	repositories := repos.NewDBStore(dbconn.Global, sql.TxOptions{})
 
 	enterpriseServices.CampaignsResolver = campaignsResolvers.NewResolver(dbconn.Global)
-	enterpriseServices.GithubWebhook = campaigns.NewGitHubWebhook(campaignsStore, repositories, msResolutionClock)
+	enterpriseServices.GitHubWebhook = campaigns.NewGitHubWebhook(campaignsStore, repositories, msResolutionClock)
+	enterpriseServices.GitLabWebhook = campaigns.NewGitLabWebhook(campaignsStore, repositories, msResolutionClock)
 	enterpriseServices.BitbucketServerWebhook = campaigns.NewBitbucketServerWebhook(
 		campaignsStore,
 		repositories,
