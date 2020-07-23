@@ -30,11 +30,15 @@ import { property, isDefined } from '../../../../../../shared/src/util/types'
 import { useObservable } from '../../../../../../shared/src/util/useObservable'
 
 interface Props extends ThemeProps, PlatformContextProps, TelemetryProps, ExtensionsControllerProps {
-    campaign: Pick<GQL.ICampaign, 'id' | 'closedAt' | 'viewerCanAdminister'>
+    campaignID: GQL.ID
+    viewerCanAdminister: boolean
     history: H.History
     location: H.Location
     campaignUpdates: Subject<void>
     changesetUpdates: Subject<void>
+    /** When true, only open changesets will be listed. */
+    onlyOpen?: boolean
+    hideFilters?: boolean
 
     /** For testing only. */
     queryChangesets?: (campaignID: GQL.ID, args: FilteredConnectionQueryArgs) => Observable<Connection<GQL.Changeset>>
@@ -57,7 +61,8 @@ function getLSPTextDocumentPositionParameters(
  * A list of a campaign's changesets.
  */
 export const CampaignChangesets: React.FunctionComponent<Props> = ({
-    campaign,
+    campaignID,
+    viewerCanAdminister,
     history,
     location,
     isLightTheme,
@@ -66,9 +71,11 @@ export const CampaignChangesets: React.FunctionComponent<Props> = ({
     extensionsController,
     platformContext,
     telemetryService,
+    onlyOpen = false,
+    hideFilters = false,
     queryChangesets = _queryChangesets,
 }) => {
-    const [state, setState] = useState<GQL.ChangesetState | undefined>()
+    const [state, setState] = useState<GQL.ChangesetExternalState | undefined>()
     const [reviewState, setReviewState] = useState<GQL.ChangesetReviewState | undefined>()
     const [checkState, setCheckState] = useState<GQL.ChangesetCheckState | undefined>()
 
@@ -76,12 +83,15 @@ export const CampaignChangesets: React.FunctionComponent<Props> = ({
         (args: FilteredConnectionQueryArgs) =>
             merge(of(undefined), changesetUpdates).pipe(
                 switchMap(() =>
-                    queryChangesets(campaign.id, { ...args, state, reviewState, checkState }).pipe(
-                        repeatWhen(notifier => notifier.pipe(delay(5000)))
-                    )
+                    queryChangesets(campaignID, {
+                        ...args,
+                        externalState: onlyOpen ? GQL.ChangesetExternalState.OPEN : state,
+                        reviewState,
+                        checkState,
+                    }).pipe(repeatWhen(notifier => notifier.pipe(delay(5000))))
                 )
             ),
-        [campaign.id, state, reviewState, checkState, queryChangesets, changesetUpdates]
+        [campaignID, state, reviewState, checkState, queryChangesets, changesetUpdates, onlyOpen]
     )
 
     const containerElements = useMemo(() => new Subject<HTMLElement | null>(), [])
@@ -138,17 +148,64 @@ export const CampaignChangesets: React.FunctionComponent<Props> = ({
         componentRerenders.next()
     }, [componentRerenders, hoverState])
 
-    const changesetFiltersRow = (
+    return (
+        <>
+            {!hideFilters && <ChangesetFiltersRow />}
+            <div className="list-group position-relative" ref={nextContainerElement}>
+                <FilteredConnection<GQL.Changeset, Omit<ChangesetNodeProps, 'node'>>
+                    className="mt-2"
+                    nodeComponent={ChangesetNode}
+                    nodeComponentProps={{
+                        isLightTheme,
+                        viewerCanAdminister,
+                        history,
+                        location,
+                        campaignUpdates,
+                        extensionInfo: { extensionsController, hoverifier },
+                    }}
+                    queryConnection={queryChangesetsConnection}
+                    hideSearch={true}
+                    defaultFirst={15}
+                    noun="changeset"
+                    pluralNoun="changesets"
+                    history={history}
+                    location={location}
+                    useURLQuery={true}
+                />
+                {hoverState?.hoverOverlayProps && (
+                    <WebHoverOverlay
+                        {...hoverState.hoverOverlayProps}
+                        telemetryService={telemetryService}
+                        extensionsController={extensionsController}
+                        isLightTheme={isLightTheme}
+                        location={location}
+                        platformContext={platformContext}
+                        hoverRef={nextOverlayElement}
+                        onCloseButtonClick={nextCloseButtonClick}
+                    />
+                )}
+            </div>
+        </>
+    )
+}
+
+const ChangesetFiltersRow: React.FunctionComponent<{}> = () => {
+    const [externalState, setExternalState] = useState<GQL.ChangesetExternalState | undefined>()
+    const [reviewState, setReviewState] = useState<GQL.ChangesetReviewState | undefined>()
+    const [checkState, setCheckState] = useState<GQL.ChangesetCheckState | undefined>()
+    return (
         <div className="form-inline mb-0 mt-2">
-            <label htmlFor="changeset-state-filter">State</label>
+            <label htmlFor="changeset-external-state-filter">External state</label>
             <select
                 className="form-control mx-2"
-                value={state}
-                onChange={event => setState((event.target.value || undefined) as GQL.ChangesetState | undefined)}
-                id="changeset-state-filter"
+                value={externalState}
+                onChange={event =>
+                    setExternalState((event.target.value || undefined) as GQL.ChangesetExternalState | undefined)
+                }
+                id="changeset-external-state-filter"
             >
                 <option value="">All</option>
-                {Object.values(GQL.ChangesetState).map(state => (
+                {Object.values(GQL.ChangesetExternalState).map(state => (
                     <option value={state} key={state}>
                         {upperFirst(lowerCase(state))}
                     </option>
@@ -187,45 +244,5 @@ export const CampaignChangesets: React.FunctionComponent<Props> = ({
                 ))}
             </select>
         </div>
-    )
-
-    return (
-        <>
-            {changesetFiltersRow}
-            <div className="list-group position-relative" ref={nextContainerElement}>
-                <FilteredConnection<GQL.Changeset, Omit<ChangesetNodeProps, 'node'>>
-                    className="mt-2"
-                    nodeComponent={ChangesetNode}
-                    nodeComponentProps={{
-                        isLightTheme,
-                        viewerCanAdminister: campaign.viewerCanAdminister,
-                        history,
-                        location,
-                        campaignUpdates,
-                        extensionInfo: { extensionsController, hoverifier },
-                    }}
-                    queryConnection={queryChangesetsConnection}
-                    hideSearch={true}
-                    defaultFirst={15}
-                    noun="changeset"
-                    pluralNoun="changesets"
-                    history={history}
-                    location={location}
-                    useURLQuery={false}
-                />
-                {hoverState?.hoverOverlayProps && (
-                    <WebHoverOverlay
-                        {...hoverState.hoverOverlayProps}
-                        telemetryService={telemetryService}
-                        extensionsController={extensionsController}
-                        isLightTheme={isLightTheme}
-                        location={location}
-                        platformContext={platformContext}
-                        hoverRef={nextOverlayElement}
-                        onCloseButtonClick={nextCloseButtonClick}
-                    />
-                )}
-            </div>
-        </>
     )
 }

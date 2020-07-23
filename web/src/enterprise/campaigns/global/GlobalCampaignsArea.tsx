@@ -14,6 +14,7 @@ import { CampaignsDotComPage } from './marketing/CampaignsDotComPage'
 import { CampaignsSiteAdminMarketingPage } from './marketing/CampaignsSiteAdminMarketingPage'
 import { CampaignsUserMarketingPage } from './marketing/CampaignsUserMarketingPage'
 import { CampaignsBetaFeedbackAlert } from './CampaignsBetaFeedbackAlert'
+import { CampaignClosePreview } from '../close/CampaignClosePreview'
 
 interface Props
     extends RouteComponentProps<{}>,
@@ -68,6 +69,12 @@ export const AuthenticatedCampaignsArea = withAuthenticatedUser<AuthenticatedPro
                             path={`${match.url}/cli`}
                             render={props => <CampaignCliHelp {...outerProps} {...props} />}
                             exact={true}
+                        />
+                        <Route
+                            path={`${match.url}/:campaignID/close`}
+                            render={({ match, ...props }: RouteComponentProps<{ campaignID: string }>) => (
+                                <CampaignClosePreview {...outerProps} {...props} campaignID={match.params.campaignID} />
+                            )}
                         />
                         <Route
                             path={`${match.url}/:campaignID`}

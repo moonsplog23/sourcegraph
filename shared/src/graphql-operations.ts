@@ -8,6 +8,9 @@ export interface SharedGraphQlOperations {
     ExternalServicesForTests: /* src/testing/driver.ts */ (
         variables: ExternalServicesForTestsVariables
     ) => ExternalServicesForTestsResult
+    GetRepositoryForDriver: /* src/testing/driver.ts */ (
+        variables: GetRepositoryForDriverVariables
+    ) => GetRepositoryForDriverResult
     SiteForTests: /* src/testing/driver.ts */ (variables: SiteForTestsVariables) => SiteForTestsResult
     UpdateSiteConfigurationForTests: /* src/testing/driver.ts */ (
         variables: UpdateSiteConfigurationForTestsVariables
@@ -89,6 +92,14 @@ export type ExternalServicesForTestsResult = {
     externalServices: {
         totalCount: number
     }
+}
+export type GetRepositoryForDriverVariables = {
+    name: string
+}
+export type GetRepositoryForDriverResult = {
+    repository: {
+        id: string
+    } | null
 }
 export type SiteForTestsVariables = {}
 export type SiteForTestsResult = {

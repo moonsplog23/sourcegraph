@@ -77,26 +77,31 @@ export const fetchCampaignById = (campaign: ID): Observable<ICampaign | null> =>
 
 export const queryChangesets = (
     campaign: ID,
-    { first, state, reviewState, checkState }: IChangesetsOnCampaignArguments
+    { first, externalState, reviewState, checkState }: IChangesetsOnCampaignArguments
 ): Observable<Connection<Changeset>> =>
     queryGraphQL(
         gql`
             query CampaignChangesets(
                 $campaign: ID!
                 $first: Int
-                $state: ChangesetState
+                $externalState: ChangesetExternalState
                 $reviewState: ChangesetReviewState
                 $checkState: ChangesetCheckState
             ) {
                 node(id: $campaign) {
                     __typename
                     ... on Campaign {
-                        changesets(first: $first, state: $state, reviewState: $reviewState, checkState: $checkState) {
+                        changesets(
+                            first: $first
+                            externalState: $externalState
+                            reviewState: $reviewState
+                            checkState: $checkState
+                        ) {
                             totalCount
                             nodes {
                                 __typename
 
-                                state
+                                externalState
                                 createdAt
                                 updatedAt
                                 nextSyncAt
@@ -155,7 +160,7 @@ export const queryChangesets = (
 
             ${DiffStatFields}
         `,
-        { campaign, first, state, reviewState, checkState }
+        { campaign, first, externalState, reviewState, checkState }
     ).pipe(
         map(dataOrThrowErrors),
         map(({ node }) => {
