@@ -499,6 +499,7 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 	t.Run("Create", func(t *testing.T) {
 		var i int
 		for i = 0; i < cap(changesets); i++ {
+			failureMessage := fmt.Sprintf("failure-%d", i)
 			th := &cmpgn.Changeset{
 				RepoID:              repo.ID,
 				CreatedAt:           clock.now(),
@@ -512,6 +513,16 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 				ExternalState:       cmpgn.ChangesetExternalStateOpen,
 				ExternalReviewState: cmpgn.ChangesetReviewStateApproved,
 				ExternalCheckState:  cmpgn.ChangesetCheckStatePassed,
+
+				ChangesetSpecID: int64(i) + 1,
+				State:           cmpgn.ChangesetStateUnpublished,
+
+				WorkerState:    "queued",
+				FailureMessage: &failureMessage,
+				StartedAt:      clock.now(),
+				FinishedAt:     clock.now(),
+				ProcessAfter:   clock.now(),
+				NumResets:      18,
 			}
 
 			// Only set the diff stats on a subset to make sure that
@@ -780,10 +791,10 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 			for _, c := range changesets {
 				c.SetDeleted()
 				c.UpdatedAt = clock.now()
-			}
 
-			if err := s.UpdateChangesets(ctx, changesets...); err != nil {
-				t.Fatal(err)
+				if err := s.UpdateChangeset(ctx, c); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			have, _, err = s.ListChangesets(ctx, ListChangesetsOpts{WithoutDeleted: true})
@@ -1023,6 +1034,15 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 			c.Metadata = &bitbucketserver.PullRequest{ID: 1234}
 			c.ExternalServiceType = extsvc.TypeBitbucketServer
 
+			c.ChangesetSpecID = c.ChangesetSpecID + 1
+			c.State = cmpgn.ChangesetStatePublishing
+			c.WorkerState = "errored"
+			c.FailureMessage = nil
+			c.StartedAt = clock.now()
+			c.FinishedAt = clock.now()
+			c.ProcessAfter = clock.now()
+			c.NumResets = 99
+
 			have = append(have, c.Clone())
 
 			c.UpdatedAt = clock.now()
@@ -1084,6 +1104,9 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 			t.Fatal(diff)
 		}
 
+		clock.add(1 * time.Second)
+		want = want[0:0]
+		have = have[0:0]
 		for _, c := range changesets {
 			c.Metadata = &gitlab.MergeRequest{ID: 1234, IID: 123}
 			c.ExternalServiceType = extsvc.TypeGitLab
@@ -1101,7 +1124,6 @@ func testStoreChangesets(t *testing.T, ctx context.Context, s *Store, reposStore
 		if diff := cmp.Diff(have, want); diff != "" {
 			t.Fatal(diff)
 		}
-
 	})
 }
 
@@ -1516,7 +1538,7 @@ func testStoreListChangesetSyncData(t *testing.T, ctx context.Context, s *Store,
 		// Attach cs1 to both an open and closed campaign
 		openCampaignID := changesets[1].CampaignIDs[0]
 		changesets[0].CampaignIDs = []int64{closedCampaignID, openCampaignID}
-		err = s.UpdateChangesets(ctx, changesets[0])
+		err = s.UpdateChangeset(ctx, changesets[0])
 		if err != nil {
 			t.Fatal(err)
 		}

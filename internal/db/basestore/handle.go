@@ -36,6 +36,9 @@ func (h *TransactableHandle) InTransaction() bool {
 	return ok
 }
 
+// TODO(mrnugget): HACK HACK HACK
+func (h *TransactableHandle) DB() dbutil.DB { return h.db }
+
 // Transact returns a new transactional database handle whose methods operate within the context of
 // a new transaction or a new savepoint. This method will return an error if the underlying connection
 // cannot be interface upgraded to a TxBeginner.

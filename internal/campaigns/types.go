@@ -230,7 +230,23 @@ type Changeset struct {
 	DiffStatChanged     *int32
 	DiffStatDeleted     *int32
 	SyncState           ChangesetSyncState
+
+	// TODO: state, changesetSpecID
+	ChangesetSpecID int64
+	State           ChangesetState
+
+	// Worker related stuff
+
+	WorkerState    string
+	FailureMessage *string
+	StartedAt      time.Time
+	FinishedAt     time.Time
+	ProcessAfter   time.Time
+	NumResets      int64
 }
+
+// RecordID is needed to implement the workerutil.Record interface.
+func (c *Changeset) RecordID() int { return int(c.ID) }
 
 // Clone returns a clone of a Changeset.
 func (c *Changeset) Clone() *Changeset {

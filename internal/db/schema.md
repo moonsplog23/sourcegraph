@@ -142,9 +142,9 @@ Referenced by:
  repo_id               | integer                  | not null
  created_at            | timestamp with time zone | not null default now()
  updated_at            | timestamp with time zone | not null default now()
- metadata              | jsonb                    | not null default '{}'::jsonb
- external_id           | text                     | not null
- external_service_type | text                     | not null
+ metadata              | jsonb                    | default '{}'::jsonb
+ external_id           | text                     | 
+ external_service_type | text                     | 
  external_deleted_at   | timestamp with time zone | 
  external_branch       | text                     | 
  external_updated_at   | timestamp with time zone | 
@@ -158,6 +158,13 @@ Referenced by:
  diff_stat_deleted     | integer                  | 
  sync_state            | jsonb                    | not null default '{}'::jsonb
  changeset_spec_id     | bigint                   | 
+ state                 | text                     | default 'UNPUBLISHED'::text
+ worker_state          | text                     | default 'queued'::text
+ failure_message       | text                     | 
+ started_at            | timestamp with time zone | 
+ finished_at           | timestamp with time zone | 
+ process_after         | timestamp with time zone | 
+ num_resets            | integer                  | not null default 0
 Indexes:
     "changesets_pkey" PRIMARY KEY, btree (id)
     "changesets_repo_external_id_unique" UNIQUE CONSTRAINT, btree (repo_id, external_id)
