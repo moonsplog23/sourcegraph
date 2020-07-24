@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
 	"time"
 
@@ -399,7 +398,7 @@ func batchChangesetsQuery(fmtstr string, cs []*campaigns.Changeset) (*sqlf.Query
 		DiffStatDeleted     *int32                            `json:"diff_stat_deleted"`
 		SyncState           json.RawMessage                   `json:"sync_state"`
 
-		ChangesetSpecID int64                    `json:"changeset_spec_id"`
+		ChangesetSpecID *int64                   `json:"changeset_spec_id"`
 		State           campaigns.ChangesetState `json:"state"`
 
 		WorkerState    string    `json:"worker_state"`
@@ -447,7 +446,7 @@ func batchChangesetsQuery(fmtstr string, cs []*campaigns.Changeset) (*sqlf.Query
 			DiffStatDeleted:     c.DiffStatDeleted,
 			SyncState:           syncState,
 
-			ChangesetSpecID: c.ChangesetSpecID,
+			ChangesetSpecID: nullInt64Column(c.ChangesetSpecID),
 			State:           c.State,
 
 			WorkerState:    c.WorkerState,
@@ -955,7 +954,7 @@ func (s *Store) updateChangesetQuery(c *campaigns.Changeset) (*sqlf.Query, error
 		c.DiffStatChanged,
 		c.DiffStatDeleted,
 		syncState,
-		c.ChangesetSpecID,
+		nullInt64Column(c.ChangesetSpecID),
 		c.State,
 		c.WorkerState,
 		c.FailureMessage,
@@ -1746,7 +1745,7 @@ type scanner interface {
 type scanFunc func(scanner) (last, count int64, err error)
 
 func scanAll(rows *sql.Rows, scan scanFunc) (last, count int64, err error) {
-	defer closeErr(rows, &err)
+	defer func() { err = closeRows(rows, err) }()
 
 	last = -1
 	for rows.Next() {
@@ -1760,10 +1759,36 @@ func scanAll(rows *sql.Rows, scan scanFunc) (last, count int64, err error) {
 	return last, count, rows.Err()
 }
 
-func closeErr(c io.Closer, err *error) {
-	if e := c.Close(); err != nil && *err == nil {
-		*err = e
+func closeRows(rows *sql.Rows, err error) error {
+	return basestore.CloseRows(rows, err)
+}
+
+func scanFirstChangeset(rows *sql.Rows, err error) (*campaigns.Changeset, bool, error) {
+	changesets, err := scanChangesets(rows, err)
+	if err != nil || len(changesets) == 0 {
+		return &campaigns.Changeset{}, false, err
 	}
+	return changesets[0], true, nil
+}
+
+func scanChangesets(rows *sql.Rows, queryErr error) (_ []*campaigns.Changeset, err error) {
+	if queryErr != nil {
+		return nil, queryErr
+	}
+	defer func() { err = closeRows(rows, err) }()
+
+	var changesets []*campaigns.Changeset
+	for rows.Next() {
+		var c campaigns.Changeset
+
+		if err := scanChangeset(&c, rows); err != nil {
+			return nil, err
+		}
+
+		changesets = append(changesets, &c)
+	}
+
+	return changesets, nil
 }
 
 func scanChangeset(t *campaigns.Changeset, s scanner) error {
@@ -1796,7 +1821,7 @@ func scanChangeset(t *campaigns.Changeset, s scanner) error {
 		&t.DiffStatChanged,
 		&t.DiffStatDeleted,
 		&syncState,
-		&t.ChangesetSpecID,
+		&dbutil.NullInt64{N: &t.ChangesetSpecID},
 		&t.State,
 		&t.WorkerState,
 		&dbutil.NullString{S: &failureMessage},

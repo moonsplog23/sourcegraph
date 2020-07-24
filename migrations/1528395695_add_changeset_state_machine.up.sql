@@ -19,8 +19,6 @@ ALTER TABLE changesets ALTER COLUMN external_service_type DROP NOT NULL;
 -- on the code host and is synced.
 UPDATE changesets SET state = 'SYNCED';
 
-
-
 -- EXPERIMENTAL: making workerutil work with changesets
 ALTER TABLE changesets ADD COLUMN IF NOT EXISTS worker_state text DEFAULT 'queued';
 ALTER TABLE changesets ADD COLUMN IF NOT EXISTS failure_message text;
@@ -28,11 +26,5 @@ ALTER TABLE changesets ADD COLUMN IF NOT EXISTS started_at timestamp with time z
 ALTER TABLE changesets ADD COLUMN IF NOT EXISTS finished_at timestamp with time zone;
 ALTER TABLE changesets ADD COLUMN IF NOT EXISTS process_after timestamp with time zone;
 ALTER TABLE changesets ADD COLUMN IF NOT EXISTS num_resets integer NOT NULL DEFAULT 0;
-
-CREATE VIEW changesets_with_changeset_spec_spec AS
-    SELECT c.*, specs.spec as spec FROM changesets c
-    JOIN changeset_specs specs ON specs.id = c.changeset_spec_id
-    JOIN repo r ON r.id = specs.repo_id
-    WHERE r.deleted_at IS NULL;
 
 COMMIT;
